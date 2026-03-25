@@ -196,6 +196,41 @@ static void render_kb_LED_state(void) {
 }
 
 static void render_layer_state(void) {
+#ifdef CORNE_VIAL_FULL_LAYER_OLED
+    /* 128x32 @ 270°: five 6px columns; full-width "=" rules read as horizontal emphasis. */
+    /* Layer 0: intentionally blank (same 3-row height as other labels for stable layout). */
+    static const char PROGMEM vial_layer_base[] = "     \n" "     \n" "     \0";
+    static const char PROGMEM vial_layer_nav[]  = "=====\n" " NAV \n" "=====\0";
+    static const char PROGMEM vial_layer_sym[]  = "=====\n" " SYM \n" "=====\0";
+    static const char PROGMEM vial_layer_fn[]   = "=====\n" " Fn  \n" "=====\0";
+    static const char PROGMEM vial_layer_mouse[] = "=====\n" "MOUSE\n" "=====\0";
+    static const char PROGMEM vial_layer_ext[]  = "=====\n" " EXT \n" "=====\0";
+    static const char PROGMEM vial_layer_none[] = "=====\n" "  -  \n" "=====\0";
+
+    switch (get_highest_layer(layer_state | default_layer_state)) {
+        case 0:
+            oled_write_P(vial_layer_base, false);
+            break;
+        case 1:
+            oled_write_P(vial_layer_nav, false);
+            break;
+        case 2:
+            oled_write_P(vial_layer_sym, false);
+            break;
+        case 3:
+            oled_write_P(vial_layer_fn, false);
+            break;
+        case 4:
+            oled_write_P(vial_layer_mouse, false);
+            break;
+        case 5:
+            oled_write_P(vial_layer_ext, false);
+            break;
+        default:
+            oled_write_P(vial_layer_none, false);
+            break;
+    }
+#else
     static const char PROGMEM default_layer[] = {
         0x20, 0x94, 0x95, 0x96, 0x20,
         0x20, 0xb4, 0xb5, 0xb6, 0x20,
@@ -226,6 +261,7 @@ static void render_layer_state(void) {
         default:
             oled_write_P(default_layer, false);
     }
+#endif
 }
 
 

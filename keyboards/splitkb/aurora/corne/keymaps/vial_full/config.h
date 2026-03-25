@@ -17,3 +17,6 @@
 #define RGB_MATRIX_KEYPRESSES
 
 #define DYNAMIC_KEYMAP_LAYER_COUNT 7
+
+/* Framed text layer labels in corne.c (vial_full layer order 0–6). */
+#define CORNE_VIAL_FULL_LAYER_OLED

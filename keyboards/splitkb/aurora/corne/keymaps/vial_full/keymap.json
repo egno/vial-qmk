@@ -1,0 +1,135 @@
+{
+    "keyboard": "splitkb/aurora/corne/rev1",
+    "keymap": "vial_full",
+    "version": 1,
+    "layout": "LAYOUT_split_3x6_3",
+    "layers": [
+        [
+            "LSFT(KC_GRV)", "KC_Q", "KC_W", "KC_F", "KC_P", "KC_B" , "KC_J", "KC_L", "KC_U", "KC_Y", "KC_SCLN", "KC_EQUAL" ,
+            "KC_F20", "LGUI_T(KC_A)", "LALT_T(KC_R)", "LCTL_T(KC_S)", "LSFT_T(KC_T)", "KC_G" , "KC_M", "RSFT_T(KC_N)", "RCTL_T(KC_E)", "RALT_T(KC_I)", "RGUI_T(KC_O)", "KC_QUOTE" ,
+            "LSFT(KC_BSLS)", "KC_Z", "KC_X", "KC_C", "KC_D", "KC_V" , "KC_K", "KC_H", "KC_COMM", "KC_DOT", "KC_SLASH", "KC_MINUS" ,
+                                                "LGUI_T(KC_BSPC)", "LT(1,KC_TAB)", "LT(4,KC_SPC)", "LT(3,KC_ENTER)", "LT(2,KC_ESC)", "KC_LGUI"
+        ],
+        [
+            "KC_PSCR", "XXXXXXX", "KC_APP", "KC_UP", "KC_PGUP", "KC_HOME" , "XXXXXXX", "KC_MPRV", "KC_MPLY", "KC_MNXT", "XXXXXXX", "XXXXXXX" ,
+            "KC_SCRL", "KC_LALT", "KC_LEFT", "KC_DOWN", "KC_RGHT", "KC_END" , "XXXXXXX", "KC_RSFT", "KC_RCTL", "KC_RALT", "KC_RGUI", "NK_TOGG" ,
+            "KC_PAUSE", "KC_LCTL", "KC_DEL", "KC_BSPC", "KC_PGDN", "KC_INSERT" , "XXXXXXX", "XXXXXXX", "XXXXXXX", "XXXXXXX", "XXXXXXX", "QK_LLCK" ,
+                                                "_______", "_______", "_______", "_______", "_______", "_______"
+        ],
+        [
+            "XXXXXXX", "LSFT(KC_1)", "LSFT(KC_2)", "LSFT(KC_9)", "LSFT(KC_0)", "KC_BSLS" , "XXXXXXX", "KC_1", "KC_2", "KC_3", "KC_PCMM", "XXXXXXX" ,
+            "XXXXXXX", "KC_LGUI", "LALT_T(KC_PAST)", "LCTL_T(KC_LBRC)", "LSFT_T(KC_RBRC)", "LSFT(KC_BSLS)" , "LSA(KC_2)", "RSFT_T(KC_4)", "RCTL_T(KC_5)", "RALT_T(KC_6)", "RGUI_T(KC_0)", "XXXXXXX" ,
+            "XXXXXXX", "XXXXXXX", "LSFT(KC_3)", "LSFT(KC_LBRC)", "LSFT(KC_RBRC)", "XXXXXXX" , "RALT(KC_4)", "KC_7", "KC_8", "KC_9", "KC_PDOT", "QK_LLCK" ,
+                                                "_______", "_______", "_______", "_______", "_______", "RM_TOGG"
+        ],
+        [
+            "KC_PWR", "KC_SLEP", "XXXXXXX", "XXXXXXX", "XXXXXXX", "XXXXXXX" , "KC_F15", "KC_F1", "KC_F2", "KC_F3", "KC_F12", "KC_F17" ,
+            "XXXXXXX", "KC_LGUI", "KC_LALT", "LCTL_T(KC_LBRC)", "LSFT_T(KC_RBRC)", "XXXXXXX" , "KC_F14", "RSFT_T(KC_F4)", "RCTL_T(KC_F5)", "RALT_T(KC_F6)", "RGUI_T(KC_F11)", "KC_F16" ,
+            "XXXXXXX", "KC_UNDO", "KC_CUT", "KC_COPY", "XXXXXXX", "KC_PSTE" , "KC_F13", "KC_F7", "KC_F8", "KC_F9", "KC_F10", "QK_LLCK" ,
+                                                "_______", "_______", "_______", "_______", "_______", "_______"
+        ],
+        [
+            "KC_LCTL", "XXXXXXX", "XXXXXXX", "KC_MS_U", "KC_WH_U", "XXXXXXX" , "KC_ACL2", "KC_MPRV", "KC_MPLY", "KC_MNXT", "XXXXXXX", "XXXXXXX" ,
+            "KC_LSFT", "KC_WH_L", "KC_MS_L", "KC_MS_D", "KC_MS_R", "KC_WH_R" , "KC_ACL1", "KC_BTN1", "KC_BTN2", "KC_BTN3", "KC_BTN4", "XXXXXXX" ,
+            "KC_LALT", "KC_LGUI", "XXXXXXX", "XXXXXXX", "KC_WH_D", "XXXXXXX" , "KC_ACL0", "XXXXXXX", "KC_MUTE", "XXXXXXX", "XXXXXXX", "QK_LLCK" ,
+                                                "_______", "_______", "_______", "_______", "_______", "MO(5)"
+        ],
+        [
+            "_______", "_______", "_______", "_______", "_______", "_______" , "_______", "_______", "_______", "_______", "_______", "_______" ,
+            "_______", "_______", "_______", "_______", "_______", "_______" , "_______", "_______", "_______", "_______", "_______", "_______" ,
+            "_______", "_______", "_______", "_______", "_______", "_______" , "_______", "_______", "_______", "_______", "_______", "_______" ,
+                                                "_______", "_______", "_______", "_______", "_______", "_______"
+        ],
+        [
+            "_______", "_______", "_______", "_______", "_______", "_______" , "_______", "_______", "_______", "_______", "_______", "_______" ,
+            "_______", "_______", "_______", "_______", "_______", "_______" , "_______", "_______", "_______", "_______", "_______", "_______" ,
+            "_______", "_______", "_______", "_______", "_______", "_______" , "_______", "_______", "_______", "_______", "_______", "_______" ,
+                                                "_______", "_______", "_______", "_______", "_______", "_______"
+        ]
+    ],
+    "encoders": [
+        [
+            {
+                "ccw": "KC_VOLD",
+                "cw": "KC_VOLU"
+            },
+            {
+                "ccw": "KC_VOLD",
+                "cw": "KC_VOLU"
+            }
+        ],
+        [
+            {
+                "ccw": "KC_VOLD",
+                "cw": "KC_VOLU"
+            },
+            {
+                "ccw": "KC_BRID",
+                "cw": "KC_BRIU"
+            }
+        ],
+        [
+            {
+                "ccw": "KC_VOLD",
+                "cw": "KC_VOLU"
+            },
+            {
+                "ccw": "RM_VALD",
+                "cw": "RM_VALU"
+            }
+        ],
+        [
+            {
+                "ccw": "KC_VOLD",
+                "cw": "KC_VOLU"
+            },
+            {
+                "ccw": "KC_WH_D",
+                "cw": "KC_WH_U"
+            }
+        ],
+        [
+            {
+                "ccw": "KC_VOLD",
+                "cw": "KC_VOLU"
+            },
+            {
+                "ccw": "KC_WH_D",
+                "cw": "KC_WH_U"
+            }
+        ],
+        [
+            {
+                "ccw": "KC_VOLD",
+                "cw": "KC_VOLU"
+            },
+            {
+                "ccw": "KC_WH_L",
+                "cw": "KC_WH_R"
+            }
+        ],
+        [
+            {
+                "ccw": "KC_VOLD",
+                "cw": "KC_VOLU"
+            },
+            {
+                "ccw": "KC_VOLD",
+                "cw": "KC_VOLU"
+            }
+        ]
+    ],
+    "config": {
+        "features": {
+            "oled": true,
+            "rgb_matrix": true,
+            "rgblight": false
+        },
+        "rgblight": {
+            "hue_steps": 8,
+            "saturation_steps": 8,
+            "brightness_steps": 8,
+            "sleep": true
+        }
+    }
+}

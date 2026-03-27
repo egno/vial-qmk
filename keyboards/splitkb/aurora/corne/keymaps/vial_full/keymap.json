@@ -11,9 +11,9 @@
                                                 "LGUI_T(KC_BSPC)", "LT(1,KC_TAB)", "LT(4,KC_SPC)", "LT(3,KC_ENTER)", "LT(2,KC_ESC)", "KC_LGUI"
         ],
         [
-            "KC_PSCR", "XXXXXXX", "KC_APP", "KC_UP", "KC_PGUP", "KC_HOME" , "XXXXXXX", "KC_MPRV", "KC_MPLY", "KC_MNXT", "XXXXXXX", "XXXXXXX" ,
-            "KC_SCRL", "KC_LALT", "KC_LEFT", "KC_DOWN", "KC_RGHT", "KC_END" , "XXXXXXX", "KC_RSFT", "KC_RCTL", "KC_RALT", "KC_RGUI", "NK_TOGG" ,
-            "KC_PAUSE", "KC_LCTL", "KC_DEL", "KC_BSPC", "KC_PGDN", "KC_INSERT" , "XXXXXXX", "XXXXXXX", "XXXXXXX", "XXXXXXX", "XXXXXXX", "QK_LLCK" ,
+            "KC_PSCR", "LGUI(KC_LEFT)", "LALT(KC_LEFT)", "KC_UP", "LALT(KC_RGHT)", "LGUI(KC_RGHT)" ,    "XXXXXXX", "KC_PGUP", "KC_MPLY", "KC_MNXT", "XXXXXXX", "XXXXXXX" ,
+            "KC_SCRL", "KC_HOME", "KC_LEFT", "KC_DOWN", "KC_RIGHT", "KC_END" ,                          "XXXXXXX", "KC_RSFT", "KC_RCTL", "KC_RALT", "KC_RGUI", "NK_TOGG" ,
+            "KC_PAUSE", "LALT(KC_DEL)", "KC_DEL", "KC_BSPC", "LALT(KC_BSPC)", "KC_INSERT" ,                        "XXXXXXX", "KC_PGDN", "XXXXXXX", "XXXXXXX", "XXXXXXX", "QK_LLCK" ,
                                                 "_______", "_______", "_______", "_______", "_______", "_______"
         ],
         [

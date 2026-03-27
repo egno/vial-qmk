@@ -201,7 +201,7 @@ static void render_mouse_jiggler_row(void) {
         oled_write_P(PSTR("..J..\n"), false);
     } else {
         /* One static row so jiggle ticks do not dirty the buffer and reset OLED_TIMEOUT via oled_on(). */
-        oled_write_P(PSTR("**|J|**\n"), false);
+        oled_write_P(PSTR("<<J>>\n"), false);
     }
 }
 #    endif

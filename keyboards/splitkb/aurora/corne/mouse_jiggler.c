@@ -5,7 +5,7 @@
 
 /* Off by default: periodic USB mouse reports can line up with OLED power-save / I2C timing on
  * some builds; use QK_KB_0 to enable when you want jiggle. */
-static bool     mouse_jiggler_feature_enabled = false;
+static bool     mouse_jiggler_feature_enabled = true;
 static uint32_t mouse_jiggler_last_send_ms  = 0;
 static int8_t   mouse_jiggler_step          = 1;
 

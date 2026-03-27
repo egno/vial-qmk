@@ -3,7 +3,9 @@
 #include "mouse_jiggler.h"
 #include "quantum.h"
 
-static bool     mouse_jiggler_feature_enabled = true;
+/* Off by default: periodic USB mouse reports can line up with OLED power-save / I2C timing on
+ * some builds; use QK_KB_0 to enable when you want jiggle. */
+static bool     mouse_jiggler_feature_enabled = false;
 static uint32_t mouse_jiggler_last_send_ms  = 0;
 static int8_t   mouse_jiggler_step          = 1;
 
@@ -60,8 +62,4 @@ bool mouse_jiggler_process_record_kb(uint16_t keycode, keyrecord_t *record) {
 
 bool mouse_jiggler_is_feature_enabled(void) {
     return mouse_jiggler_feature_enabled;
-}
-
-int8_t mouse_jiggler_get_step(void) {
-    return mouse_jiggler_step;
 }

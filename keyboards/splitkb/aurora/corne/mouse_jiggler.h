@@ -18,4 +18,3 @@ void mouse_jiggler_housekeeping_kb(void);
 bool mouse_jiggler_process_record_kb(uint16_t keycode, keyrecord_t *record);
 
 bool mouse_jiggler_is_feature_enabled(void);
-int8_t mouse_jiggler_get_step(void);

@@ -9,3 +9,6 @@ VIAL_ENABLE = yes
 VIALRGB_ENABLE = yes
 
 ENCODER_MAP_ENABLE = yes
+
+# Tap-hold keys held and released alone tap the key at the same position on the last layer.
+SRC += hold_alone.c

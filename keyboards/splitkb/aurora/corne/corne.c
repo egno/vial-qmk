@@ -115,11 +115,11 @@ static void render_layer_state(void) {
     /* 128x32 @ 270°: five 6px columns; full-width "=" rules read as horizontal emphasis. */
     /* Layer 0: intentionally blank (same 3-row height as other labels for stable layout). */
     static const char PROGMEM vial_layer_base[] = "     \n" "     \n" "     \0";
-    static const char PROGMEM vial_layer_nav[]  = "=====\n" " NAV \n" "=====\0";
-    static const char PROGMEM vial_layer_sym[]  = "=====\n" "  1  \n" "=====\0";
     static const char PROGMEM vial_layer_fn[]   = "=====\n" " Fn  \n" "=====\0";
-    static const char PROGMEM vial_layer_mouse[] = "=====\n" "MOUSE\n" "=====\0";
-    static const char PROGMEM vial_layer_ext[]  = "=====\n" " EXT \n" "=====\0";
+    static const char PROGMEM vial_layer_nav[]  = "=====\n" " Nav \n" "=====\0";
+    static const char PROGMEM vial_layer_mouse[] = "=====\n" " Mou \n" "=====\0";
+    static const char PROGMEM vial_layer_sym[]  = "=====\n" " Sym \n" "=====\0";
+    static const char PROGMEM vial_layer_num[]  = "=====\n" " Num \n" "=====\0";
     static const char PROGMEM vial_layer_none[] = "=====\n" "  -  \n" "=====\0";
 
     switch (get_highest_layer(layer_state | default_layer_state)) {
@@ -127,19 +127,19 @@ static void render_layer_state(void) {
             oled_write_P(vial_layer_base, false);
             break;
         case 1:
-            oled_write_P(vial_layer_nav, false);
-            break;
-        case 2:
-            oled_write_P(vial_layer_sym, false);
-            break;
-        case 3:
             oled_write_P(vial_layer_fn, false);
             break;
-        case 4:
+        case 2:
+            oled_write_P(vial_layer_nav, false);
+            break;
+        case 3:
             oled_write_P(vial_layer_mouse, false);
             break;
+        case 4:
+            oled_write_P(vial_layer_sym, false);
+            break;
         case 5:
-            oled_write_P(vial_layer_ext, false);
+            oled_write_P(vial_layer_num, false);
             break;
         default:
             oled_write_P(vial_layer_none, false);

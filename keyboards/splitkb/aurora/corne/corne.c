@@ -117,9 +117,9 @@ static void render_layer_state(void) {
     static const char PROGMEM vial_layer_base[] = "     \n" "     \n" "     \0";
     static const char PROGMEM vial_layer_fn[]   = "=====\n" " Fn  \n" "=====\0";
     static const char PROGMEM vial_layer_nav[]  = "=====\n" " Nav \n" "=====\0";
-    static const char PROGMEM vial_layer_mouse[] = "=====\n" " Mou \n" "=====\0";
-    static const char PROGMEM vial_layer_sym[]  = "=====\n" " Sym \n" "=====\0";
-    static const char PROGMEM vial_layer_num[]  = "=====\n" " Num \n" "=====\0";
+    static const char PROGMEM vial_layer_mouse[] = "=====\n" "  M  \n" "=====\0";
+    static const char PROGMEM vial_layer_sym[]  = "=====\n" "  %  \n" "=====\0";
+    static const char PROGMEM vial_layer_num[]  = "=====\n" "  1  \n" "=====\0";
     static const char PROGMEM vial_layer_none[] = "=====\n" "  -  \n" "=====\0";
 
     switch (get_highest_layer(layer_state | default_layer_state)) {

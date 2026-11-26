@@ -1,0 +1,56 @@
+# corne_host
+
+Host-side tool for the raw HID commands of the Aurora Corne `vial_full` keymap
+(`keyboards/splitkb/aurora/corne/keymaps/vial_full`). The protocol is documented in
+`host_hid.h` in that directory.
+
+## Install
+
+The only dependency is the Python hidapi binding:
+
+    python3 -m pip install hidapi
+
+(Use a virtualenv if you do not want it in your user site: `python3 -m venv .venv && .venv/bin/pip install hidapi`.)
+
+The keyboard is found by VID/PID (read from the keyboard's `info.json` / `rev1/keyboard.json`, with
+`8D1D:343A` built in as a fallback) and the QMK raw HID usage page `0xFF60`, usage `0x61`. Plug in
+the left half: raw HID ends on the USB (master) side. Vial can stay open at the same time.
+
+## Commands
+
+    corne_host.py version                     firmware version, build date, commit
+
+    corne_host.py drills push FILE            replace the host drill set with the lines of FILE
+    corne_host.py drills push FILE --append   add to the loaded set instead
+    corne_host.py drills push FILE --only     ...and drill host items only (--mixed switches back)
+    corne_host.py drills mode host|mixed      switch the mode without pushing
+    corne_host.py drills info                 capacity / count / mode
+    corne_host.py drills clear                drop all host items
+
+    corne_host.py status set 14:05 EN MIC --invert 3
+    corne_host.py status clear
+    corne_host.py status watch [--layout] [--mic]
+
+    corne_host.py misfire                     per-key mod-tap misfire counters (RAM only)
+    corne_host.py misfire --reset             zero them
+
+### Drills
+
+One item per line, printable ASCII, at most 24 characters; blank lines are skipped and trailing
+whitespace is dropped. The keyboard holds up to 64 host items in RAM; they are gone after a power
+cycle. Each line is reported as accepted or rejected. The firmware rejects an item when it is too
+long, a duplicate, the set is full, or it contains a character no key on the current keymap can
+type (the message names the character).
+
+Host items form their own group next to the built-in ones and are picked by the same weighting
+(slow / error-prone characters and never-typed items come up more often). In `host` mode only host
+items are picked, as long as at least one of them is typeable; otherwise the trainer falls back to
+the full set.
+
+### Status text
+
+Three rows of five characters on the right-half OLED, below the WPM graph. The keyboard drops the
+text `--ttl` seconds (default 90, max 255) after the last update, so it does not go stale when the
+script stops. `status watch` shows the clock on row 1 and refreshes it well inside the TTL; on macOS
+`--layout` adds the input source on row 2 (via `defaults read com.apple.HIToolbox`) and `--mic` adds
+`MIC` on row 3, inverted while the input volume is 0 (via `osascript`). Ctrl-C clears the text.

@@ -10,11 +10,7 @@
  */
 #include QMK_KEYBOARD_H
 #include "dynamic_keymap.h"
-
-/* Last Vial layer; not reachable from the keymap, used only as config. */
-#ifndef HOLD_ALONE_LAYER
-#    define HOLD_ALONE_LAYER (DYNAMIC_KEYMAP_LAYER_COUNT - 1)
-#endif
+#include "hold_alone.h"
 
 /* Longer holds are treated as "changed my mind" and send nothing. */
 #ifndef HOLD_ALONE_MAX_MS
@@ -33,9 +29,10 @@ static void hold_alone_send(uint16_t keycode) {
     }
 }
 
-bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+/* Called from user_hooks.c for every event. */
+void hold_alone_process_record(uint16_t keycode, keyrecord_t *record) {
     if (!record->event.pressed) {
-        return true;
+        return;
     }
 
     /* Any press cancels; a held tap-hold key then re-arms for itself. */
@@ -45,11 +42,10 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         hold_alone_key     = record->event.key;
         hold_alone_timer   = record->event.time;
     }
-    return true;
 }
 
 /* Runs after the release is handled, so mods / layers are already off. */
-void post_process_record_user(uint16_t keycode, keyrecord_t *record) {
+void hold_alone_post_process_record(uint16_t keycode, keyrecord_t *record) {
     if (record->event.pressed || !hold_alone_pending || !KEYEQ(record->event.key, hold_alone_key)) {
         return;
     }

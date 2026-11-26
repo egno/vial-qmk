@@ -1,5 +1,9 @@
 {
     "lighting": "vialrgb",
+    "customKeycodes": [
+        {"name": "JIGGLER", "title": "Toggle mouse jiggler (QK_KB_0)", "shortName": "Jiggle"},
+        {"name": "TRAINER", "title": "Toggle layer/symbol drill trainer (QK_KB_1)", "shortName": "Trainer"}
+    ],
     "matrix": {
         "rows": 8,
         "cols": 6

@@ -74,3 +74,18 @@
 
 /* Framed text layer labels in corne.c (vial_full layer order 0–6). */
 #define CORNE_VIAL_FULL_LAYER_OLED
+
+/* Custom split RPCs: right-half OLED status (oled_status.c) and trainer flash/heatmap mirror (trainer.c). */
+#define SPLIT_TRANSACTION_IDS_USER USER_SYNC_STATUS, TRAINER_SYNC, HOST_STATUS_SYNC
+
+/* Home-row mods (hrm.c). Chordal Hold and Flow Tap are Vial "QMK Settings" that default to off;
+ * these are applied over the stored settings at every power-up, without writing EEPROM.
+ * HRM_CHORDAL_HOLD: a mod-tap/layer-tap chorded with a key on the same hand is a tap (thumbs exempt).
+ * HRM_FLOW_TAP_TERM (ms): an alpha mod-tap pressed this soon after another alpha key is a tap.
+ * Used only while Vial's "Flow Tap term" is 0; a non-zero value saved in Vial wins. 0 = leave it to Vial. */
+#define HRM_CHORDAL_HOLD
+#define HRM_FLOW_TAP_TERM 130
+
+/* Each half times its own OLED out. With the stock sync the right half is switched off whenever
+ * the left one goes idle, even while its WPM graph is still moving. */
+#undef SPLIT_OLED_ENABLE

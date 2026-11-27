@@ -46,9 +46,9 @@
  *      still valid, so "get 0" doubles as the count query). Multi-byte fields
  *      are little-endian; keycode is the key's current base-layer keycode.
  *
- * 0xF4-0xF6 are read-only and pull-only: the host polls, the keyboard never
- * sends a report on its own (Vial may be using the same interface). All
- * multi-byte fields are little-endian. Matrix positions are numbered
+ * 0xF4-0xF6 are read-only and pull-only: the host polls. The keyboard never
+ * sends a report on its own (Vial may be using the same interface) unless a
+ * host asked for it with 0xF7. All multi-byte fields are little-endian. Matrix positions are numbered
  * row * 6 + col (8 rows x 6 columns: rows 0-3 left half, 4-7 right half;
  * 3,0-3,2 and 7,0-7,2 have no key); a 48-bit "matrix mask" is 6 bytes, bit
  * (pos % 8) of byte (pos / 8) is position pos. Mod masks are QMK's 8-bit
@@ -169,9 +169,64 @@
  *      a key outside it does not arm Flow Tap for the next key. On top of the
  *      mask Flow Tap is off while Ctrl, GUI or left Alt is held.
  *
- * 0xF7 free.
+ * 0xF7 HOST_HID_EVENTS    [0xF7, sub, ...]   push instead of poll: state and pressed keys
+ *      sub 0 subscribe [0xF7, 0, ttl_s]   ttl_s 1..255 seconds; 0 unsubscribes
+ *      sub 1 state     [0xF7, 1]          the current state event, as a reply
+ *      sub 2 matrix    [0xF7, 2]          the current matrix event, as a reply
+ *      Sub 1 and 2 work without a subscription and change nothing.
+ *
+ *      Reply sub 0: [0xF7, 0, status (0), ttl_s as applied], the rest 0.
+ *      There is one subscription, not one per host program. It ends ttl_s
+ *      seconds after the last sub 0 request, so the host repeats the request
+ *      well inside that time (e.g. every ttl_s / 3); it also ends at once on
+ *      ttl_s 0 and on any USB suspend, reset or reconfiguration. The device is
+ *      usually open in several programs at once (Vial), so the reports have
+ *      to stop by themselves when the subscriber dies.
+ *
+ *      While subscribed the keyboard sends the two reports below unasked.
+ *      They are told from replies by byte 1 only; a reply to sub 1 / sub 2 and
+ *      the event of that kind are the same bytes. Every sub 0 request with
+ *      ttl_s > 0 (renewals too) is followed by one event of each kind with
+ *      the current values, changed or not, after the reply. Changes are
+ *      looked for once per main loop pass (host_hid_housekeeping), so a pass
+ *      sends at most one event of each kind and what happened inside one pass
+ *      is seen as its end result.
+ *
+ *      State event, by byte offset (bytes 26-31 are 0):
+ *       0     0xF7
+ *       1     1
+ *       2-25  bytes 2-25 of the 0xF4 reply, bit for bit (byte 2 = status 0,
+ *             byte 3 = highest layer, ... byte 25 = number of layers)
+ *      Sent when any of bytes 2-25 differs from the state event sent last.
+ *      None of these fields moves without the user or the host doing
+ *      something; still, state events are kept at least 20 ms apart, and the
+ *      state at the end of a burst is always sent.
+ *
+ *      Matrix event, by byte offset (bytes 11-31 are 0):
+ *       0     0xF7
+ *       1     2
+ *       2     status, always 0
+ *       3     matrix rows (8)
+ *       4     matrix columns (6)
+ *       5-10  matrix mask (see above; the same packing as in 0xF6) of the keys
+ *             physically down, both halves, after debouncing. Byte 5 bit 0
+ *             is row 0 col 0; read as a little-endian 48-bit number, bit
+ *             row * 6 + col.
+ *      Sent when the mask differs from the one sent last; not rate limited.
+ *      It shows switches, not keycodes: it does not depend on layers and
+ *      also reports keys the trainer swallows.
+ *
+ *      Privacy: the matrix event tells every program that has the raw HID
+ *      interface open which keys are down, i.e. together with the keymap
+ *      (readable over VIA) what is being typed, without any OS-level input
+ *      monitoring permission. That is why it is off until a host subscribes
+ *      and why the subscription expires. Vial and VIA tools pair requests
+ *      and replies by order only and can take an event for their reply, so
+ *      do not keep a subscription running while editing the keymap in Vial.
  */
 #pragma once
+
+#include <stdbool.h>
 
 enum host_hid_command {
     HOST_HID_VERSION = 0xF0,
@@ -181,7 +236,19 @@ enum host_hid_command {
     HOST_HID_STATE   = 0xF4,
     HOST_HID_TRAINER = 0xF5,
     HOST_HID_TAPHOLD = 0xF6,
+    HOST_HID_EVENTS  = 0xF7,
 };
+
+/* 0xF7 sub-commands; 1 and 2 are also byte 1 of the unsolicited reports. */
+enum host_hid_events_sub {
+    HOST_HID_EVENTS_SUBSCRIBE,
+    HOST_HID_EVENTS_STATE,
+    HOST_HID_EVENTS_MATRIX,
+};
+
+/* Hooks, dispatched from user_hooks.c. */
+void host_hid_housekeeping(void);
+void host_hid_usb_state(bool configured);
 
 enum host_hid_trainer_sub {
     HOST_HID_TRAINER_SUMMARY,

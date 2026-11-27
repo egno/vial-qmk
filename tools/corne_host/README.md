@@ -39,6 +39,11 @@ the left half: raw HID ends on the USB (master) side. Vial can stay open at the 
                                               last trainer session, per-character (and per-item) stats
     corne_host.py taphold [LAYER]             keys exempt from Chordal Hold / left alone by Flow Tap
 
+    corne_host.py events watch [--ttl N] [--no-keys]
+                                              pushed state and pressed-key events until Ctrl-C
+    corne_host.py events get                  the same two reports once, without subscribing
+    corne_host.py events off                  end a subscription now
+
 ### Drills
 
 One item per line, printable ASCII, at most 24 characters; blank lines are skipped and trailing
@@ -62,8 +67,8 @@ script stops. `status watch` shows the clock on row 1 and refreshes it well insi
 
 ### Live state, trainer statistics, tap-hold info
 
-These three only read (`0xF4`-`0xF6` in `host_hid.h`); the keyboard never sends anything unasked, so
-polling them next to an open Vial is safe.
+These three only read (`0xF4`-`0xF6` in `host_hid.h`); answering them the keyboard never sends
+anything unasked, so polling them next to an open Vial is safe.
 
 `state` prints one line: highest layer, active / default / locked layers, held and one-shot mods,
 Caps Word / Caps Lock, the trainer state and how many trainer sessions were finished since power-up.
@@ -79,3 +84,19 @@ polling host when a new summary is worth fetching.
 rule, tap-hold keys (`x` = Flow Tap never forces this one to tap), and keys that take part in Flow
 Tap. Without `LAYER` it describes the keys as they resolve with the layers active right now. The
 masks come from the table and function the firmware itself decides with (`hrm.c`).
+
+### Events
+
+`0xF7` in `host_hid.h`: instead of being polled the keyboard sends a state event (the payload of
+`state`) whenever that state changes, and a matrix event (which switches are physically down, as
+`row,col` of the 8x6 matrix: rows 0-3 left half, 4-7 right half) whenever a key goes down or up.
+`events watch` subscribes, renews the subscription every `--ttl`/3 seconds (default ttl 5, max 255)
+and prints both; each renewal makes the keyboard repeat the current state and keys, so identical lines
+show up at that rate. Ctrl-C unsubscribes. If the script is killed the keyboard stops sending `--ttl`
+seconds later at most; it also stops on USB suspend or re-plug.
+
+The matrix event is a privacy matter: while a subscription runs, every program that has the raw HID
+interface open can see which keys are pressed. Hence it is opt-in and expires; `--no-keys` only hides
+the lines here, the keyboard still sends them. There is one subscription for all programs, and Vial
+can mistake an event for the reply to one of its own requests, so do not leave `events watch` running
+while you edit the keymap in Vial.

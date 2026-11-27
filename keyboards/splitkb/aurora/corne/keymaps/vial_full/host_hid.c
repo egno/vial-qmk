@@ -2,6 +2,7 @@
 /* Raw HID dispatcher for the keymap-level commands; protocol in host_hid.h. */
 #include "quantum.h"
 #include "via.h"
+#include "raw_hid.h"
 #include "host_hid.h"
 #include "fw_version.h"
 #include "host_status.h"
@@ -11,7 +12,7 @@
 
 _Static_assert(TRAINER_ITEM_MAX_LEN <= 32 - 3, "a drill item must fit one raw HID report");
 _Static_assert(TRAINER_ITEM_MAX_LEN <= 32 - 6, "a drill item text must fit one 0xF5 reply");
-_Static_assert(MATRIX_ROWS * MATRIX_COLS <= 48, "0xF6 packs four 48-bit matrix masks into one report");
+_Static_assert(MATRIX_ROWS * MATRIX_COLS <= 48, "0xF6 and 0xF7 pack 48-bit matrix masks into one report");
 _Static_assert(HOST_STATUS_ROWS * HOST_STATUS_COLS <= 32 - 3, "the host text must fit one raw HID report");
 
 static void drills_hid(uint8_t *data, uint8_t length) {
@@ -104,11 +105,11 @@ static void misfire_hid(uint8_t *data, uint8_t length) {
     }
 }
 
-/* 0xF4: everything here is the master's own state (layers, mods, host LEDs,
- * trainer); nothing comes from the other half. */
-static void state_hid(uint8_t *data, uint8_t length) {
+/* Bytes 2.. of the 0xF4 reply and of the 0xF7 state event. Everything here
+ * is the master's own state (layers, mods, host LEDs, trainer); nothing comes
+ * from the other half. */
+static void state_fill(uint8_t *data, uint8_t length) {
     memset(&data[2], 0, length - 2);
-    data[1]    = 0;
     data[3]    = get_highest_layer(layer_state | default_layer_state);
     uint8_t *p = put_le(&data[4], layer_state, 4);
     p          = put_le(p, default_layer_state, 4);
@@ -141,6 +142,11 @@ static void state_hid(uint8_t *data, uint8_t length) {
     data[23] = get_mods();
     data[24] = get_weak_mods();
     data[25] = keymap_layer_count_hid();
+}
+
+static void state_hid(uint8_t *data, uint8_t length) {
+    data[1] = 0;
+    state_fill(data, length);
 }
 
 static void trainer_hid(uint8_t *data, uint8_t length) {
@@ -248,6 +254,94 @@ static void taphold_hid(uint8_t *data, uint8_t length) {
     }
 }
 
+/* Bytes 2.. of the 0xF7 matrix event: the debounced matrix as the master sees
+ * it, which holds both halves (matrix_post_scan() copies the other half's rows
+ * in on every scan). */
+static void matrix_fill(uint8_t *data, uint8_t length) {
+    memset(&data[2], 0, length - 2);
+    data[3] = MATRIX_ROWS;
+    data[4] = MATRIX_COLS;
+    for (uint8_t r = 0; r < MATRIX_ROWS; r++) {
+        matrix_row_t row = matrix_get_row(r);
+        for (uint8_t c = 0; c < MATRIX_COLS; c++) {
+            if (row & ((matrix_row_t)1 << c)) mask_set(&data[5], r * MATRIX_COLS + c);
+        }
+    }
+}
+
+/* 0xF7 subscription. ev_ttl_ms 0 = nobody subscribed, nothing is ever sent. */
+#define EV_STATE_OFFSET 2
+#define EV_STATE_LEN 24 /* bytes 2..25 */
+#define EV_MATRIX_OFFSET 5
+#define EV_MATRIX_LEN 6
+#define EV_STATE_MIN_GAP_MS 20
+
+static volatile uint32_t ev_ttl_ms;
+static uint32_t          ev_set_at;
+static uint16_t          ev_state_at;
+static uint8_t           ev_force; /* bit HOST_HID_EVENTS_STATE / _MATRIX: send even if unchanged */
+static uint8_t           ev_last_state[EV_STATE_LEN], ev_last_matrix[EV_MATRIX_LEN];
+
+static void events_hid(uint8_t *data, uint8_t length) {
+    switch (data[1]) {
+        case HOST_HID_EVENTS_SUBSCRIBE: {
+            uint8_t ttl = data[2];
+            memset(&data[2], 0, length - 2);
+            data[3]   = ttl;
+            ev_set_at = timer_read32();
+            ev_force  = 1 << HOST_HID_EVENTS_STATE | 1 << HOST_HID_EVENTS_MATRIX;
+            ev_ttl_ms = (uint32_t)ttl * 1000;
+            break;
+        }
+        case HOST_HID_EVENTS_STATE:
+            state_fill(data, length);
+            break;
+        case HOST_HID_EVENTS_MATRIX:
+            matrix_fill(data, length);
+            break;
+        default:
+            data[0] = id_unhandled;
+            break;
+    }
+}
+
+/* Unsolicited reports must not outlive the host's interest in them: any USB
+ * suspend, reset or reconfiguration ends the subscription. May run in the USB
+ * interrupt, hence only the one store. */
+void host_hid_usb_state(bool configured) {
+    if (!configured) ev_ttl_ms = 0;
+}
+
+static void event_send(uint8_t kind, void (*fill)(uint8_t *, uint8_t), uint8_t *last, uint8_t offset, uint8_t len) {
+    uint8_t report[32];
+    report[0] = HOST_HID_EVENTS;
+    report[1] = kind;
+    fill(report, sizeof(report));
+    if (!(ev_force & (1 << kind)) && memcmp(last, &report[offset], len) == 0) return;
+    if (kind == HOST_HID_EVENTS_STATE) {
+        /* Nothing in the state changes on its own, but a burst of changes
+         * (rolled mods, one-shots) is held to one report per gap; the last
+         * state always gets out, since the comparison is against what was sent. */
+        if (!(ev_force & (1 << kind)) && timer_elapsed(ev_state_at) < EV_STATE_MIN_GAP_MS) return;
+        ev_state_at = timer_read();
+    }
+    ev_force &= ~(1 << kind);
+    memcpy(last, &report[offset], len);
+    raw_hid_send(report, sizeof(report));
+}
+
+/* Change detection for the 0xF7 events: once per main loop pass, after the
+ * matrix scan and key processing of that pass, at most one report of each kind. */
+void host_hid_housekeeping(void) {
+    if (!ev_ttl_ms) return;
+    if (timer_elapsed32(ev_set_at) > ev_ttl_ms) {
+        ev_ttl_ms = 0;
+        return;
+    }
+    event_send(HOST_HID_EVENTS_STATE, state_fill, ev_last_state, EV_STATE_OFFSET, EV_STATE_LEN);
+    event_send(HOST_HID_EVENTS_MATRIX, matrix_fill, ev_last_matrix, EV_MATRIX_OFFSET, EV_MATRIX_LEN);
+}
+
 void raw_hid_receive_kb(uint8_t *data, uint8_t length) {
     /* VIA also routes a few of its own ids here (custom channels); they stay unhandled. */
     if (length < 32) {
@@ -275,6 +369,9 @@ void raw_hid_receive_kb(uint8_t *data, uint8_t length) {
             break;
         case HOST_HID_TAPHOLD:
             taphold_hid(data, length);
+            break;
+        case HOST_HID_EVENTS:
+            events_hid(data, length);
             break;
         default:
             data[0] = id_unhandled;

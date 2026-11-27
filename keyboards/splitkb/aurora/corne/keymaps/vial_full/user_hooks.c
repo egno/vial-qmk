@@ -1,13 +1,15 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 /*
  * Single owner of the QMK user hooks shared by hold_alone.c, fw_version.c,
- * oled_status.c and trainer.c. trainer.c additionally owns oled_init_user and
+ * host_hid.c, oled_status.c and trainer.c. trainer.c additionally owns oled_init_user and
  * rgb_matrix_indicators_advanced_user, and host_hid.c raw_hid_receive_kb,
  * which nothing else defines.
  */
 #include "quantum.h"
+#include "usb_device_state.h"
 #include "fw_version.h"
 #include "hold_alone.h"
+#include "host_hid.h"
 #include "host_status.h"
 #include "hrm.h"
 #include "misfire.h"
@@ -26,6 +28,12 @@ void housekeeping_task_user(void) {
     status_housekeeping();
     host_status_housekeeping();
     trainer_housekeeping();
+    /* Last, so the 0xF7 events carry what the modules above did in this pass. */
+    host_hid_housekeeping();
+}
+
+void notify_usb_device_state_change_user(struct usb_device_state usb_device_state) {
+    host_hid_usb_state(usb_device_state.configure_state == USB_DEVICE_STATE_CONFIGURED);
 }
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {

@@ -31,6 +31,7 @@ CMD_MISFIRE = 0xF3
 CMD_STATE = 0xF4
 CMD_TRAINER = 0xF5
 CMD_TAPHOLD = 0xF6
+CMD_EVENTS = 0xF7
 UNHANDLED = 0xFF
 
 DRILLS_INFO, DRILLS_CLEAR, DRILLS_ADD, DRILLS_MODE = range(4)
@@ -40,12 +41,14 @@ TRAINER_STATES = ("off", "session running", "results screen", "on, nothing typea
 ITEM_GROUPS = ("pairs", "snippets", "numbers", "host")
 MISS_KINDS = ("wrong key", "held", "tapped", "wrong layer")
 TAPHOLD_CURRENT = 0xFF
+EVENTS_SUBSCRIBE, EVENTS_STATE, EVENTS_MATRIX = range(3)
 MATRIX_ROWS, MATRIX_COLS = 8, 6
 DRILL_ERRORS = {1: "host set is full", 2: "bad length", 3: "untypeable character", 4: "duplicate"}
 
 STATUS_ROWS = 3
 STATUS_COLS = 5
 DEFAULT_TTL = 90
+DEFAULT_EVENTS_TTL = 5
 
 
 def usb_ids():
@@ -73,19 +76,37 @@ class Keyboard:
         if hasattr(hid, "device"):  # "hidapi" package
             self.dev = hid.device()
             self.dev.open_path(paths[0])
-            self._read = lambda: self.dev.read(REPORT_SIZE, 1000)
+            self._read = lambda ms=1000: self.dev.read(REPORT_SIZE, ms)
         else:  # "hid" package
             self.dev = hid.Device(path=paths[0])
-            self._read = lambda: self.dev.read(REPORT_SIZE, timeout=1000)
+            self._read = lambda ms=1000: self.dev.read(REPORT_SIZE, timeout=ms)
 
-    def request(self, *payload):
+    def send(self, *payload):
         data = bytes(payload)
         if len(data) > REPORT_SIZE:
             raise ValueError("request does not fit one report")
         data = data.ljust(REPORT_SIZE, b"\0")
         self.dev.write(b"\0" + data)  # leading report id
-        reply = bytes(self._read() or b"")
-        if len(reply) < REPORT_SIZE:
+        return data
+
+    def read(self, timeout_ms=1000):
+        """One report, or None when nothing arrived in time."""
+        report = bytes(self._read(timeout_ms) or b"")
+        return report if len(report) >= REPORT_SIZE else None
+
+    def request(self, *payload):
+        data = self.send(*payload)
+        deadline = time.monotonic() + 1
+        while True:
+            reply = self.read(max(1, int((deadline - time.monotonic()) * 1000)))
+            # With a 0xF7 subscription running (ours or another program's) events arrive in between the replies.
+            # A 0xF7 reply is told from an event by byte 1; for sub 1/2 the two carry the same payload.
+            if reply is None or reply[0] != CMD_EVENTS or (data[0] == CMD_EVENTS and reply[1] == data[1]):
+                break
+            if time.monotonic() >= deadline:
+                reply = None
+                break
+        if reply is None:
             sys.exit("No reply from the keyboard.")
         if reply[0] == UNHANDLED:
             sys.exit(f"The firmware does not know command 0x{data[0]:02X}/{data[1]} (old build?).")
@@ -115,12 +136,20 @@ class Keyboard:
                 "held": held, "tapped": tapped, "holds": holds, "taps": taps}
 
     def state(self):
-        r = self.request(CMD_STATE)
-        highest, layers, default, locked, flags, trainer, sessions, osm, osm_locked, osl, mods, weak, count = struct.unpack_from("<BIIIBBHBBBBBB", r, 3)
-        return {"highest": highest, "layers": layers, "default": default, "locked": locked,
-                "trainer_active": bool(flags & 1), "caps_word": bool(flags & 2), "caps_lock": bool(flags & 4),
-                "trainer_state": trainer, "sessions": sessions, "oneshot_mods": osm, "oneshot_locked_mods": osm_locked,
-                "oneshot_layer": None if osl == 0xFF else osl, "mods": mods, "weak_mods": weak, "layer_count": count}
+        return parse_state(self.request(CMD_STATE))
+
+    def subscribe(self, ttl=DEFAULT_EVENTS_TTL):
+        """Ask for state and matrix events for `ttl` seconds (1..255); returns the ttl the keyboard applied."""
+        return self.request(CMD_EVENTS, EVENTS_SUBSCRIBE, ttl)[3]
+
+    def unsubscribe(self):
+        self.subscribe(0)
+
+    def event_state(self):
+        return parse_state(self.request(CMD_EVENTS, EVENTS_STATE))
+
+    def event_matrix(self):
+        return parse_matrix(self.request(CMD_EVENTS, EVENTS_MATRIX))
 
     def trainer_summary(self):
         r = self.request(CMD_TRAINER, TRAINER_SUMMARY)
@@ -156,6 +185,20 @@ class Keyboard:
         mask = lambda at: int.from_bytes(r[at:at + 6], "little")
         return {"ok": r[2] == 0, "chordal": bool(r[3] & 1), "flow": bool(r[3] & 2), "flow_term": struct.unpack_from("<H", r, 4)[0],
                 "rows": r[6], "cols": r[7], "exempt": mask(8), "right": mask(14), "tap_hold": mask(20), "flow_keys": mask(26)}
+
+
+def parse_state(r):
+    """Bytes 3-25 of a 0xF4 reply or of a 0xF7 state event (same layout)."""
+    highest, layers, default, locked, flags, trainer, sessions, osm, osm_locked, osl, mods, weak, count = struct.unpack_from("<BIIIBBHBBBBBB", r, 3)
+    return {"highest": highest, "layers": layers, "default": default, "locked": locked,
+            "trainer_active": bool(flags & 1), "caps_word": bool(flags & 2), "caps_lock": bool(flags & 4),
+            "trainer_state": trainer, "sessions": sessions, "oneshot_mods": osm, "oneshot_locked_mods": osm_locked,
+            "oneshot_layer": None if osl == 0xFF else osl, "mods": mods, "weak_mods": weak, "layer_count": count}
+
+
+def parse_matrix(r):
+    """A 0xF7 matrix event: bit row * cols + col of `pressed` is that key."""
+    return {"rows": r[3], "cols": r[4], "pressed": int.from_bytes(r[5:11], "little")}
 
 
 def describe(info):
@@ -238,6 +281,46 @@ def cmd_state(kb, args):
                 last = s
             time.sleep(args.interval)
     except KeyboardInterrupt:
+        print()
+
+
+def print_matrix(m):
+    keys = [f"{pos // m['cols']},{pos % m['cols']}" for pos in range(m["rows"] * m["cols"]) if m["pressed"] & (1 << pos)]
+    print(f"keys  {' '.join(keys) or '-'}")
+
+
+def cmd_events_get(kb, args):
+    print_state(kb.event_state())
+    print_matrix(kb.event_matrix())
+
+
+def cmd_events_off(kb, args):
+    kb.unsubscribe()
+
+
+def cmd_events_watch(kb, args):
+    """Subscribe, keep the subscription alive and print every event until interrupted."""
+    renew_at = 0.0
+    try:
+        while True:
+            now = time.monotonic()
+            if now >= renew_at:
+                # Not request(): the reply and the events come back in one stream, read below.
+                kb.send(CMD_EVENTS, EVENTS_SUBSCRIBE, args.ttl)
+                renew_at = now + args.ttl / 3
+            r = kb.read(max(1, int((renew_at - now) * 1000)))
+            if r is None:
+                continue
+            if r[0] == UNHANDLED:
+                sys.exit(f"The firmware does not know command 0x{CMD_EVENTS:02X} (old build?).")
+            if r[0] != CMD_EVENTS:
+                continue  # a reply meant for another program
+            if r[1] == EVENTS_STATE:
+                print_state(parse_state(r))
+            elif r[1] == EVENTS_MATRIX and not args.no_keys:
+                print_matrix(parse_matrix(r))
+    except KeyboardInterrupt:
+        kb.unsubscribe()
         print()
 
 
@@ -439,6 +522,14 @@ def main():
     state.add_argument("--watch", action="store_true", help="keep polling and print every change until interrupted")
     state.add_argument("--interval", type=float, default=0.1, help="seconds between polls with --watch (default %(default)s)")
     state.set_defaults(fn=cmd_state)
+
+    events = sub.add_parser("events", help="pushed state and pressed-key events (the subscription expires by itself)").add_subparsers(dest="sub", required=True)
+    ev_watch = events.add_parser("watch", help="subscribe and print every state / matrix event until interrupted")
+    ev_watch.add_argument("--ttl", type=ttl_arg, default=DEFAULT_EVENTS_TTL, help="seconds the subscription survives without this script; renewed every ttl/3 (default %(default)s)")
+    ev_watch.add_argument("--no-keys", action="store_true", help="do not print the matrix events (pressed key positions)")
+    ev_watch.set_defaults(fn=cmd_events_watch)
+    events.add_parser("get", help="print the current state and pressed keys once, without subscribing").set_defaults(fn=cmd_events_get)
+    events.add_parser("off", help="end the subscription now").set_defaults(fn=cmd_events_off)
 
     stats = sub.add_parser("trainer-stats", help="last trainer session and per-character stats (RAM only)")
     stats.add_argument("--items", action="store_true", help="also list the per-item stats")

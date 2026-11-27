@@ -18,3 +18,7 @@ void mouse_jiggler_housekeeping_kb(void);
 bool mouse_jiggler_process_record_kb(uint16_t keycode, keyrecord_t *record);
 
 bool mouse_jiggler_is_feature_enabled(void);
+
+/* Keymap hook: return true to hold the jiggler off (nothing is sent, the OLED row reads as idle)
+ * without touching the QK_KB_0 setting. Only called on the master half. Weak default: false. */
+bool mouse_jiggler_inhibited_user(void);

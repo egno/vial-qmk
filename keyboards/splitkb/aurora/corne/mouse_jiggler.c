@@ -9,6 +9,10 @@ static bool     mouse_jiggler_feature_enabled = true;
 static uint32_t mouse_jiggler_last_send_ms  = 0;
 static int8_t   mouse_jiggler_step          = 1;
 
+__attribute__((weak)) bool mouse_jiggler_inhibited_user(void) {
+    return false;
+}
+
 void mouse_jiggler_post_init_kb(void) {
     /* QMK leaves last_*_activity timestamps at 0 until the first key/encoder event.
      * last_input_activity_elapsed() from 0 is then huge and would jiggle immediately without a guard,
@@ -29,7 +33,7 @@ void mouse_jiggler_housekeeping_kb(void) {
         return;
     }
 #    endif
-    if (!mouse_jiggler_feature_enabled) {
+    if (!mouse_jiggler_feature_enabled || mouse_jiggler_inhibited_user()) {
         return;
     }
     if (last_input_activity_elapsed() < (uint32_t)MOUSE_JIGGLER_IDLE_MS) {

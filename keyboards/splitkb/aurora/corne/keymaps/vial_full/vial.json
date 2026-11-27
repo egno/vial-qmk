@@ -2,7 +2,9 @@
     "lighting": "vialrgb",
     "customKeycodes": [
         {"name": "JIGGLER", "title": "Toggle mouse jiggler (QK_KB_0)", "shortName": "Jiggle"},
-        {"name": "TRAINER", "title": "Toggle layer/symbol drill trainer (QK_KB_1)", "shortName": "Trainer"}
+        {"name": "TRAINER", "title": "Toggle layer/symbol drill trainer (QK_KB_1)", "shortName": "Trainer"},
+        {"name": "GAME", "title": "Toggle game mode (QK_KB_2)", "shortName": "Game"},
+        {"name": "CHAT", "title": "Game mode: switch to the typing layer and back (QK_KB_3)", "shortName": "Chat"}
     ],
     "matrix": {
         "rows": 8,

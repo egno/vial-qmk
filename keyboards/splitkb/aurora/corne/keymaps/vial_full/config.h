@@ -69,10 +69,16 @@
 #    define ENABLE_RGB_MATRIX_RIVERFLOW
 #endif
 
-/* Seven layers fit RP2040 (Liatris) EEPROM/flash; build with -e CONVERT_TO=liatris. */
-#define DYNAMIC_KEYMAP_LAYER_COUNT 7
+/* Eleven layers fit RP2040 (Liatris) EEPROM/flash; build with -e CONVERT_TO=liatris.
+ * 0-5 are the typing layers; the game mode (game_mode.c) owns 6-9 and the last one is a table, not a layer:
+ *    6 GAME    plain QWERTY, no tap-holds, so nothing waits for a tapping term
+ *    7 GNUM    numbers under the left hand (held from GAME)
+ *    8 GRIGHT  mirrored right half of QWERTY on the left hand (held from GAME)
+ *    9 GNAV    tri-layer of 7 + 8, can be layer-locked
+ *   10         hold-alone config table (HOLD_ALONE_LAYER = last layer), never activated */
+#define DYNAMIC_KEYMAP_LAYER_COUNT 11
 
-/* Framed text layer labels in corne.c (vial_full layer order 0–6). */
+/* Framed text layer labels in corne.c (vial_full layer order 0–10). */
 #define CORNE_VIAL_FULL_LAYER_OLED
 
 /* Custom split RPCs: right-half OLED status (oled_status.c) and trainer flash/heatmap mirror (trainer.c). */

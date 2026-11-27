@@ -98,8 +98,14 @@ static void render_kb_LED_state(void) {
 }
 
 #    ifdef CORNE_VIAL_FULL_LAYER_OLED
+/* Keymap hook: true while the keymap is in a temporary "typing" mode on the base layer that
+ * should be labelled instead of the blank layer-0 box (vial_full: game mode chat). */
+__attribute__((weak)) bool corne_chat_mode_user(void) {
+    return false;
+}
+
 static void render_mouse_jiggler_row(void) {
-    if (!mouse_jiggler_is_feature_enabled()) {
+    if (!mouse_jiggler_is_feature_enabled() || mouse_jiggler_inhibited_user()) {
         oled_write_P(PSTR("     \n"), false);
     } else if (last_input_activity_elapsed() < (uint32_t)MOUSE_JIGGLER_IDLE_MS) {
         oled_write_P(PSTR("..J..\n"), false);
@@ -121,10 +127,16 @@ static void render_layer_state(void) {
     static const char PROGMEM vial_layer_sym[]  = "=====\n" "  %  \n" "=====\0";
     static const char PROGMEM vial_layer_num[]  = "=====\n" "  1  \n" "=====\0";
     static const char PROGMEM vial_layer_none[] = "=====\n" "  -  \n" "=====\0";
+    /* Game layers of the vial_full keymap (6-9); G = a layer held on top of the game layer. */
+    static const char PROGMEM vial_layer_game[]  = "=====\n" "GAME \n" "=====\0";
+    static const char PROGMEM vial_layer_gnum[]  = "=====\n" "G 123\n" "=====\0";
+    static const char PROGMEM vial_layer_gright[] = "=====\n" "G  >>\n" "=====\0";
+    static const char PROGMEM vial_layer_gnav[]  = "=====\n" "G NAV\n" "=====\0";
+    static const char PROGMEM vial_layer_chat[]  = "=====\n" "CHAT \n" "=====\0";
 
     switch (get_highest_layer(layer_state | default_layer_state)) {
         case 0:
-            oled_write_P(vial_layer_base, false);
+            oled_write_P(corne_chat_mode_user() ? vial_layer_chat : vial_layer_base, false);
             break;
         case 1:
             oled_write_P(vial_layer_fn, false);
@@ -140,6 +152,18 @@ static void render_layer_state(void) {
             break;
         case 5:
             oled_write_P(vial_layer_num, false);
+            break;
+        case 6:
+            oled_write_P(vial_layer_game, false);
+            break;
+        case 7:
+            oled_write_P(vial_layer_gnum, false);
+            break;
+        case 8:
+            oled_write_P(vial_layer_gright, false);
+            break;
+        case 9:
+            oled_write_P(vial_layer_gnav, false);
             break;
         default:
             oled_write_P(vial_layer_none, false);

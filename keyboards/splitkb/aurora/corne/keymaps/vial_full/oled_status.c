@@ -5,6 +5,8 @@
  *
  * The secondary half cannot see most of this state locally, so the master packs it into
  * one small struct and pushes it over a custom split transaction (USER_SYNC_STATUS).
+ * The same struct carries the game mode state for the per-key RGB cues (game_display.c),
+ * which is not drawn on this screen.
  *
  * Screen is 32x128 px (OLED_ROTATION_270): 5 chars x 16 lines.
  *   0      W 123     words per minute
@@ -27,6 +29,7 @@
 #include "oled_status.h"
 #include "host_status.h"
 #include "misfire.h"
+#include "game_display.h"
 #include <string.h>
 
 #define STATUS_NONE 0xFF
@@ -46,6 +49,7 @@ typedef struct {
     uint8_t misfire_key; // label of the mod-tap with most misfires, 0 if none yet
     uint8_t misfire_held; // its counts, capped at 99
     uint8_t misfire_tapped;
+    game_display_sync_t game; // game mode + keys to light, for the RGB cues (game_display.c)
 } status_t;
 _Static_assert(sizeof(status_t) <= RPC_M2S_BUFFER_SIZE, "status message too big for split RPC");
 
@@ -54,6 +58,7 @@ static status_t status = {.locked_layer = STATUS_NONE, .oneshot_layer = STATUS_N
 static void status_slave_handler(uint8_t in_len, const void *in_data, uint8_t out_len, void *out_data) {
     if (in_len == sizeof(status)) {
         memcpy(&status, in_data, sizeof(status));
+        game_display_receive(&status.game);
     }
 }
 
@@ -84,6 +89,7 @@ static void collect_misfire(status_t *s) {
 static status_t collect_status(void) {
     status_t s = {.locked_layer = STATUS_NONE, .oneshot_layer = STATUS_NONE};
     collect_misfire(&s);
+    game_display_collect(&s.game);
 #ifdef WPM_ENABLE
     s.wpm = get_current_wpm();
 #endif

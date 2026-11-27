@@ -1,4 +1,4 @@
-# Liatris (RP2040): use CONVERT_TO so the full 7-layer Vial map and RGB framebuffer fit; keymap rules load too late for QMK to retarget.
+# Liatris (RP2040): use CONVERT_TO so the full 11-layer Vial map and RGB framebuffer fit; keymap rules load too late for QMK to retarget.
 #   qmk compile -kb splitkb/aurora/corne/rev1 -km vial_full -e CONVERT_TO=liatris
 ifeq ($(strip $(CONVERT_TO)),liatris)
     SRC += liatris_led.c
@@ -33,6 +33,9 @@ LAYER_LOCK_ENABLE = yes
 
 # On-board layer/symbol drill; toggle with QK_KB_1 ("Trainer" in Vial).
 SRC += trainer.c
+
+# Game mode: QWERTY layers 6-9 with a chat detour; toggle with QK_KB_2 ("Game" in Vial). Display/RGB in game_display.c.
+SRC += game_mode.c game_display.c
 
 # Single owner of the shared QMK user hooks; dispatches to the modules above.
 SRC += user_hooks.c

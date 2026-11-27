@@ -12,7 +12,8 @@
  *
  * Everything except the trainer_* entry points and the QMK user hooks is
  * static. This file owns oled_init_user and
- * rgb_matrix_indicators_advanced_user; key processing, post-init,
+ * rgb_matrix_indicators_advanced_user (which chains to game_display.c while
+ * the trainer is off); key processing, post-init,
  * housekeeping and OLED task are shared with the other keymap modules and
  * dispatched from user_hooks.c via trainer_process_record/trainer_post_init/
  * trainer_housekeeping/trainer_oled_task.
@@ -32,6 +33,8 @@
 #include <string.h>
 #include "trainer.h"
 #include "hold_alone.h"
+#include "game_mode.h"
+#include "game_display.h"
 
 #if defined(SPLIT_KEYBOARD) && defined(RGB_MATRIX_ENABLE)
 #    include "transactions.h"
@@ -329,6 +332,9 @@ static char tr_expected(void) {
  */
 static char tr_key_char(uint8_t layer, keypos_t key, uint8_t held) {
     if (layer == HOLD_ALONE_LAYER) return 0; /* config only, never active */
+    /* Game layers repeat the alphabet in QWERTY: they must not own characters
+     * (tr_locate), nor turn a miss into WRONG LAYER / a layer-tap misfire. */
+    if (layer >= GAME_LAYER) return 0;
     uint16_t kc   = keymap_key_to_keycode(layer, key);
     uint8_t  mods = held;
     uint8_t  base;
@@ -934,7 +940,8 @@ void trainer_post_init(void) {
 
 #ifdef RGB_MATRIX_ENABLE
 bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
-    if (!tr_rgb.active) return true;
+    /* The trainer's display wins while it is active; otherwise game mode gets the LEDs. */
+    if (!tr_rgb.active) return game_rgb_indicators(led_min, led_max);
     uint8_t val = rgb_matrix_get_val();
     if (val < 48) val = 48;
 

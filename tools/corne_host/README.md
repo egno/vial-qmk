@@ -34,6 +34,11 @@ the left half: raw HID ends on the USB (master) side. Vial can stay open at the 
     corne_host.py misfire                     per-key mod-tap misfire counters (RAM only)
     corne_host.py misfire --reset             zero them
 
+    corne_host.py state [--watch]             layers, layer lock, mods, one-shots, trainer state
+    corne_host.py trainer-stats [--items] [--all]
+                                              last trainer session, per-character (and per-item) stats
+    corne_host.py taphold [LAYER]             keys exempt from Chordal Hold / left alone by Flow Tap
+
 ### Drills
 
 One item per line, printable ASCII, at most 24 characters; blank lines are skipped and trailing
@@ -54,3 +59,23 @@ text `--ttl` seconds (default 90, max 255) after the last update, so it does not
 script stops. `status watch` shows the clock on row 1 and refreshes it well inside the TTL; on macOS
 `--layout` adds the input source on row 2 (via `defaults read com.apple.HIToolbox`) and `--mic` adds
 `MIC` on row 3, inverted while the input volume is 0 (via `osascript`). Ctrl-C clears the text.
+
+### Live state, trainer statistics, tap-hold info
+
+These three only read (`0xF4`-`0xF6` in `host_hid.h`); the keyboard never sends anything unasked, so
+polling them next to an open Vial is safe.
+
+`state` prints one line: highest layer, active / default / locked layers, held and one-shot mods,
+Caps Word / Caps Lock, the trainer state and how many trainer sessions were finished since power-up.
+`--watch` polls every `--interval` seconds (default 0.1) and prints the line whenever it changes.
+
+`trainer-stats` prints the summary of the last finished session (WPM, accuracy, misses by kind), the
+all-time best from EEPROM, and the per-character table: attempts, misses and mean latency, worst miss
+rate first (`--all`: ASCII order). `--items` adds the per-item table. Everything but the all-time
+record lives in RAM and is cumulative since power-up; the session counter shown by `state` tells a
+polling host when a new summary is worth fetching.
+
+`taphold` draws the matrix in physical order three times: keys exempt from the Chordal Hold same-hand
+rule, tap-hold keys (`x` = Flow Tap never forces this one to tap), and keys that take part in Flow
+Tap. Without `LAYER` it describes the keys as they resolve with the layers active right now. The
+masks come from the table and function the firmware itself decides with (`hrm.c`).

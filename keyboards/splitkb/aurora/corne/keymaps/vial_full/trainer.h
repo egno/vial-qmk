@@ -54,6 +54,48 @@
 bool trainer_is_active(void);
 void trainer_toggle(void);
 
+/* ---- Read-only exports for the host (host_hid.c, commands 0xF4/0xF5). ---- */
+
+/* Wire values, see host_hid.h. */
+enum trainer_state {
+    TRAINER_STATE_OFF,
+    TRAINER_STATE_RUN,
+    TRAINER_STATE_RESULTS,
+    TRAINER_STATE_EMPTY, /* on, but no drill item is typeable on this keymap */
+};
+uint8_t trainer_state(void);
+/* Sessions finished since power-up (wraps). */
+uint16_t trainer_boot_sessions(void);
+
+#define TRAINER_ERR_KINDS 4 /* wrong key, held, tapped, wrong layer */
+typedef struct {
+    /* last finished session; all 0 until one was finished since power-up */
+    uint8_t  wpm, accuracy, items;
+    uint16_t correct, errors;
+    uint16_t err_kind[TRAINER_ERR_KINDS];
+    uint32_t active_ms;
+    /* all time, from EEPROM */
+    uint8_t  best_wpm, best_accuracy;
+    uint16_t total_sessions;
+} trainer_summary_t;
+void trainer_get_summary(trainer_summary_t *out);
+
+typedef struct {
+    uint32_t total_ms; /* summed latency of the correct keystrokes / completed runs */
+    uint16_t count;    /* correct keystrokes / completions */
+    uint16_t errors;
+} trainer_stat_t;
+
+/* Per-character stats: index 0..TRAINER_CHARS-1 is ASCII TRAINER_FIRST_CHAR + index. */
+#define TRAINER_CHARS 95
+#define TRAINER_FIRST_CHAR 0x20
+bool trainer_char_stat(uint8_t index, trainer_stat_t *out);
+
+/* Drill items: built-ins first, then the loaded host items. `*text` stays valid
+ * until the host set changes. False if `index` is out of range. */
+uint8_t trainer_item_count(void);
+bool    trainer_item_stat(uint8_t index, trainer_stat_t *out, uint8_t *group, const char **text);
+
 /* Called from user_hooks.c. trainer_process_record returns false when it consumed the event,
  * trainer_oled_task returns false when it drew the screen. */
 bool trainer_process_record(uint16_t keycode, keyrecord_t *record);

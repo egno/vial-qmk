@@ -165,7 +165,8 @@ static bool tr_char_to_key(char c, uint8_t *kc, bool *shift) {
 /* State                                                                    */
 /* ------------------------------------------------------------------------ */
 
-enum tr_state { TS_OFF, TS_RUN, TS_RESULTS, TS_EMPTY /* nothing typeable on this keymap */ };
+/* Same values as enum trainer_state, which is exported over raw HID (host_hid.h). */
+enum tr_state { TS_OFF = TRAINER_STATE_OFF, TS_RUN = TRAINER_STATE_RUN, TS_RESULTS = TRAINER_STATE_RESULTS, TS_EMPTY = TRAINER_STATE_EMPTY /* nothing typeable on this keymap */ };
 #define TR_NONE 0xff /* no item */
 
 enum tr_err {
@@ -175,9 +176,11 @@ enum tr_err {
     TE_WRONG_LAYER,   /* right physical key, wrong layer active */
     TE_COUNT
 };
+_Static_assert(TE_COUNT == TRAINER_ERR_KINDS, "exported over raw HID in this order, see host_hid.h");
 static const char *const tr_err_name[TE_COUNT] = {"WRONG KEY", "MISFIRE:held", "MISFIRE:tapped", "WRONG LAYER"};
 
 #define TR_NCHARS 95 /* printable ASCII 0x20..0x7e */
+_Static_assert(TR_NCHARS == TRAINER_CHARS && TRAINER_FIRST_CHAR == 0x20, "exported over raw HID, see host_hid.h");
 #define TR_CIDX(c) ((uint8_t)((c) - 0x20))
 #define TR_IS_PRINTABLE(c) ((c) >= 0x20 && (c) <= 0x7e)
 
@@ -253,6 +256,11 @@ static tr_item_stat_t tr_is[TR_ITEMS_MAX];
 static char           tr_host_text[TRAINER_HOST_ITEMS][TR_ITEM_MAX_LEN + 1];
 static tr_loc_t       tr_loc[TR_NCHARS];
 static tr_eeprom_t    tr_ee;
+
+/* For the host only (trainer_get_summary): the session counters in `tr` are
+ * zeroed when the next session starts, so the finished one is kept here. */
+static trainer_summary_t tr_last;
+static uint16_t          tr_boot_sessions;
 
 /* RGB state is mirrored to the slave half. */
 static struct {
@@ -495,6 +503,15 @@ static void tr_finish_session(void) {
     if (tr_ee.sessions < 0x1FFF) tr_ee.sessions++;
     tr_ee.magic = TR_EE_MAGIC;
     eeconfig_update_user(tr_ee.raw);
+
+    tr_last.wpm       = wpm;
+    tr_last.accuracy  = acc;
+    tr_last.items     = tr.items_done;
+    tr_last.correct   = tr.correct;
+    tr_last.errors    = tr.errors;
+    tr_last.active_ms = tr.active_ms;
+    memcpy(tr_last.err_kind, tr.err_kind, sizeof(tr_last.err_kind));
+    tr_boot_sessions++;
 
     uint8_t mx = 0;
     for (uint8_t r = 0; r < MATRIX_ROWS; r++)
@@ -799,6 +816,43 @@ uint8_t trainer_host_add(const char *text, uint8_t len, uint8_t *bad_pos) {
     tr.host_n++;
     tr_host_changed();
     return TRAINER_HOST_OK;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Read-only exports for the host (raw HID, see host_hid.h)                 */
+/* ------------------------------------------------------------------------ */
+
+uint8_t trainer_state(void) {
+    return tr.state;
+}
+
+uint16_t trainer_boot_sessions(void) {
+    return tr_boot_sessions;
+}
+
+void trainer_get_summary(trainer_summary_t *out) {
+    *out                = tr_last;
+    out->best_wpm       = tr_ee.best_wpm;
+    out->best_accuracy  = tr_ee.best_acc;
+    out->total_sessions = tr_ee.sessions;
+}
+
+bool trainer_char_stat(uint8_t index, trainer_stat_t *out) {
+    if (index >= TR_NCHARS) return false;
+    *out = (trainer_stat_t){.total_ms = tr_cs[index].total_ms, .count = tr_cs[index].count, .errors = tr_cs[index].errors};
+    return true;
+}
+
+uint8_t trainer_item_count(void) {
+    return tr_item_count();
+}
+
+bool trainer_item_stat(uint8_t index, trainer_stat_t *out, uint8_t *group, const char **text) {
+    if (index >= tr_item_count()) return false;
+    *out   = (trainer_stat_t){.total_ms = tr_is[index].total_ms, .count = tr_is[index].attempts, .errors = tr_is[index].errors};
+    *group = index < TR_N_DRILLS ? tr_drills[index].group : TG_HOST;
+    *text  = tr_item_text(index);
+    return true;
 }
 
 /* ------------------------------------------------------------------------ */

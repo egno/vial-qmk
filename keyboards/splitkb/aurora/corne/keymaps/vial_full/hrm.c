@@ -73,12 +73,9 @@ const char chordal_hold_layout[MATRIX_ROWS][MATRIX_COLS] PROGMEM = LAYOUT_split_
  * Mod-taps whose tap is not a letter (Tab, brackets, F-keys, digits on the
  * other layers) are left alone as well.
  */
-bool is_flow_tap_key(uint16_t keycode) {
+bool hrm_flow_tap_keycode(uint16_t keycode) {
     if (IS_QK_LAYER_TAP(keycode)) {
         return false;
-    }
-    if ((get_mods() & (MOD_MASK_CG | MOD_BIT_LALT)) != 0) {
-        return false; /* hotkeys */
     }
     switch (get_tap_keycode(keycode)) {
         case KC_A ... KC_Z:
@@ -90,4 +87,51 @@ bool is_flow_tap_key(uint16_t keycode) {
     }
     return false;
 }
+
+bool is_flow_tap_key(uint16_t keycode) {
+    if ((get_mods() & (MOD_MASK_CG | MOD_BIT_LALT)) != 0) {
+        return false; /* hotkeys */
+    }
+    return hrm_flow_tap_keycode(keycode);
+}
+#else
+bool hrm_flow_tap_keycode(uint16_t keycode) {
+    return false;
+}
 #endif
+
+/* ------------------------------------------------------------------------ */
+/* Read-only view for the host (host_hid.c, 0xF6). These read the same      */
+/* table, function and settings the tapping engine uses.                    */
+/* ------------------------------------------------------------------------ */
+
+bool hrm_chordal_hold_enabled(void) {
+#if !defined(CHORDAL_HOLD)
+    return false;
+#elif defined(QMK_SETTINGS)
+    return QS_tapping_chordal_hold != 0; /* what get_chordal_hold() in qmk_settings.c tests */
+#else
+    return true;
+#endif
+}
+
+char hrm_chordal_hand(keypos_t pos) {
+#ifdef CHORDAL_HOLD
+    return chordal_hold_handedness(pos); /* reads chordal_hold_layout above */
+#else
+    return '*';
+#endif
+}
+
+uint16_t hrm_flow_tap_term(void) {
+#if !defined(FLOW_TAP_TERM)
+    return 0;
+#else
+#    if defined(QMK_SETTINGS)
+    uint16_t term = QS.flow_tap_term; /* what get_flow_tap_term() in qmk_settings.c returns */
+#    else
+    uint16_t term = FLOW_TAP_TERM;
+#    endif
+    return term > 500 ? 500 : term; /* action_tapping.c clamps it the same way */
+#endif
+}

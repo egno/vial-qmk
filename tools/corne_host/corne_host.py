@@ -28,10 +28,19 @@ CMD_VERSION = 0xF0
 CMD_DRILLS = 0xF1
 CMD_STATUS = 0xF2
 CMD_MISFIRE = 0xF3
+CMD_STATE = 0xF4
+CMD_TRAINER = 0xF5
+CMD_TAPHOLD = 0xF6
 UNHANDLED = 0xFF
 
 DRILLS_INFO, DRILLS_CLEAR, DRILLS_ADD, DRILLS_MODE = range(4)
 MISFIRE_GET, MISFIRE_RESET = range(2)
+TRAINER_SUMMARY, TRAINER_CHARS, TRAINER_ITEM, TRAINER_TEXT = range(4)
+TRAINER_STATES = ("off", "session running", "results screen", "on, nothing typeable")
+ITEM_GROUPS = ("pairs", "snippets", "numbers", "host")
+MISS_KINDS = ("wrong key", "held", "tapped", "wrong layer")
+TAPHOLD_CURRENT = 0xFF
+MATRIX_ROWS, MATRIX_COLS = 8, 6
 DRILL_ERRORS = {1: "host set is full", 2: "bad length", 3: "untypeable character", 4: "duplicate"}
 
 STATUS_ROWS = 3
@@ -105,6 +114,49 @@ class Keyboard:
         return {"ok": r[2] == 0, "count": r[3], "row": r[5], "col": r[6], "keycode": keycode,
                 "held": held, "tapped": tapped, "holds": holds, "taps": taps}
 
+    def state(self):
+        r = self.request(CMD_STATE)
+        highest, layers, default, locked, flags, trainer, sessions, osm, osm_locked, osl, mods, weak, count = struct.unpack_from("<BIIIBBHBBBBBB", r, 3)
+        return {"highest": highest, "layers": layers, "default": default, "locked": locked,
+                "trainer_active": bool(flags & 1), "caps_word": bool(flags & 2), "caps_lock": bool(flags & 4),
+                "trainer_state": trainer, "sessions": sessions, "oneshot_mods": osm, "oneshot_locked_mods": osm_locked,
+                "oneshot_layer": None if osl == 0xFF else osl, "mods": mods, "weak_mods": weak, "layer_count": count}
+
+    def trainer_summary(self):
+        r = self.request(CMD_TRAINER, TRAINER_SUMMARY)
+        f = struct.unpack_from("<BHBBBHH4HIBBHBB", r, 3)
+        return {"have_session": r[2] == 0, "trainer_state": f[0], "sessions": f[1], "wpm": f[2], "accuracy": f[3],
+                "items": f[4], "correct": f[5], "misses": f[6], "miss_kinds": f[7:11], "active_ms": f[11],
+                "best_wpm": f[12], "best_accuracy": f[13], "total_sessions": f[14], "chars": f[15], "item_count": f[16]}
+
+    def trainer_chars(self):
+        """{char: (correct, misses, latency_ms)} for every printable ASCII character."""
+        stats, index, total = {}, 0, 1
+        while index < total:
+            r = self.request(CMD_TRAINER, TRAINER_CHARS, index)
+            total, n = r[3], r[5]
+            if r[2] != 0 or n == 0:
+                break
+            for k in range(n):
+                stats[chr(0x20 + index + k)] = struct.unpack_from("<HHI", r, 6 + 8 * k)
+            index += n
+        return stats
+
+    def trainer_item(self, index):
+        r = self.request(CMD_TRAINER, TRAINER_ITEM, index)
+        if r[2] != 0:
+            return None
+        group, _, completions, misses, time_ms = struct.unpack_from("<BBHHI", r, 5)
+        t = self.request(CMD_TRAINER, TRAINER_TEXT, index)
+        text = t[6:6 + t[5]].decode("ascii", "replace") if t[2] == 0 else ""
+        return {"group": group, "text": text, "completions": completions, "misses": misses, "time_ms": time_ms}
+
+    def taphold(self, layer=TAPHOLD_CURRENT):
+        r = self.request(CMD_TAPHOLD, layer)
+        mask = lambda at: int.from_bytes(r[at:at + 6], "little")
+        return {"ok": r[2] == 0, "chordal": bool(r[3] & 1), "flow": bool(r[3] & 2), "flow_term": struct.unpack_from("<H", r, 4)[0],
+                "rows": r[6], "cols": r[7], "exempt": mask(8), "right": mask(14), "tap_hold": mask(20), "flow_keys": mask(26)}
+
 
 def describe(info):
     mode = "host items only" if info["only"] else "mixed with built-in items"
@@ -152,6 +204,97 @@ def cmd_misfire(kb, args):
               f"{e['holds']:8}{e['held']:6}{rate(e['held'], e['holds']):>8}"
               f"{e['taps']:9}{e['tapped']:6}{rate(e['tapped'], e['taps']):>8}")
     print("bad = followed by Backspace; tapped counts include ordinary typos, so compare keys with each other.")
+
+
+def bits(mask):
+    return [n for n in range(32) if mask & (1 << n)]
+
+
+def mods_label(mask):
+    names = [side + name for side, shift in (("L", 0), ("R", 4)) for bit, name in enumerate(MOD_NAMES) if mask & (1 << (bit + shift))]
+    return "+".join(names) or "-"
+
+
+def print_state(s):
+    osl = "-" if s["oneshot_layer"] is None else s["oneshot_layer"]
+    flags = [name for name, on in (("caps word", s["caps_word"]), ("caps lock", s["caps_lock"])) if on]
+    print(f"layer {s['highest']}  on {bits(s['layers'])}  default {bits(s['default'])}  locked {bits(s['locked'])}  "
+          f"mods {mods_label(s['mods'])}  weak {mods_label(s['weak_mods'])}  "
+          f"one-shot {mods_label(s['oneshot_mods'])} locked {mods_label(s['oneshot_locked_mods'])} layer {osl}  "
+          f"trainer {TRAINER_STATES[s['trainer_state']] if s['trainer_state'] < len(TRAINER_STATES) else s['trainer_state']} "
+          f"({s['sessions']} sessions since power-up)  {' '.join(flags)}".rstrip())
+
+
+def cmd_state(kb, args):
+    if not args.watch:
+        print_state(kb.state())
+        return
+    last = None
+    try:
+        while True:
+            s = kb.state()
+            if s != last:
+                print_state(s)
+                last = s
+            time.sleep(args.interval)
+    except KeyboardInterrupt:
+        print()
+
+
+def cmd_trainer_stats(kb, args):
+    s = kb.trainer_summary()
+    print(f"trainer: {TRAINER_STATES[s['trainer_state']] if s['trainer_state'] < len(TRAINER_STATES) else s['trainer_state']}; "
+          f"{s['sessions']} sessions since power-up, {s['total_sessions']} ever; best {s['best_wpm']} wpm, {s['best_accuracy']}%")
+    if s["have_session"]:
+        kinds = ", ".join(f"{name} {n}" for name, n in zip(MISS_KINDS, s["miss_kinds"]))
+        print(f"last session: {s['wpm']} wpm, {s['accuracy']}%, {s['items']} items, {s['correct']} correct, "
+              f"{s['misses']} misses ({kinds}), {s['active_ms'] / 1000:.1f} s")
+    else:
+        print("last session: none finished since power-up")
+    chars = {ch: st for ch, st in kb.trainer_chars().items() if st[0] or st[1]}
+    if chars:
+        print(f"\n{'char':6}{'attempts':>9}{'misses':>8}{'miss %':>8}{'avg ms':>8}")
+        order = sorted(chars) if args.all else sorted(chars, key=lambda ch: (-chars[ch][1] / (chars[ch][0] + chars[ch][1]), ch))
+        for ch in order:
+            correct, misses, latency = chars[ch]
+            avg = f"{latency / correct:8.0f}" if correct else "       -"
+            print(f"{ch!r:6}{correct + misses:9}{misses:8}{100 * misses / (correct + misses):8.1f}{avg}")
+    if args.items:
+        print(f"\n{'item':26}{'group':10}{'done':>6}{'misses':>8}{'avg ms':>8}")
+        for index in range(s["item_count"]):
+            item = kb.trainer_item(index)
+            if item is None:
+                break
+            if not item["completions"] and not args.all:
+                continue
+            group = ITEM_GROUPS[item["group"]] if item["group"] < len(ITEM_GROUPS) else str(item["group"])
+            avg = f"{item['time_ms'] / item['completions']:8.0f}" if item["completions"] else "       -"
+            print(f"{item['text']:26}{group:10}{item['completions']:6}{item['misses']:8}{avg}")
+
+
+def cmd_taphold(kb, args):
+    t = kb.taphold(TAPHOLD_CURRENT if args.layer is None else args.layer)
+    if not t["ok"]:
+        sys.exit(f"The keyboard has no layer {args.layer}.")
+    print(f"Chordal Hold {'on' if t['chordal'] else 'off'}, Flow Tap {str(t['flow_term']) + ' ms' if t['flow'] else 'off'}; "
+          f"{'layers active now' if args.layer is None else 'layer ' + str(args.layer)}")
+    half = t["rows"] // 2
+    for name, mask, mark in (("exempt from the Chordal Hold same-hand rule", t["exempt"], "*"),
+                             ("tap-hold keys (T) and of those the ones Flow Tap never forces to tap (x)", t["tap_hold"], "T"),
+                             ("take part in Flow Tap", t["flow_keys"], "f")):
+        print(f"\n{name}:")
+        for row in range(half):
+            line = ""
+            # Physical order: the right half's columns run from the outside in.
+            for r, cols in ((row, range(t["cols"])), (row + half, reversed(range(t["cols"])))):
+                for c in cols:
+                    pos = r * t["cols"] + c
+                    cell = mark if mask & (1 << pos) else "."
+                    if mark == "T" and cell == "T" and not t["flow_keys"] & (1 << pos):
+                        cell = "x"
+                    line += " " + cell
+                line += "   "
+            print(" " + line.rstrip())
 
 
 def cmd_drills_info(kb, args):
@@ -291,6 +434,20 @@ def main():
     misfire = sub.add_parser("misfire", help="mod-tap misfire counters gathered during normal typing")
     misfire.add_argument("--reset", action="store_true", help="zero the counters instead of printing them")
     misfire.set_defaults(fn=cmd_misfire)
+
+    state = sub.add_parser("state", help="live state: layers, layer lock, mods, one-shots, trainer")
+    state.add_argument("--watch", action="store_true", help="keep polling and print every change until interrupted")
+    state.add_argument("--interval", type=float, default=0.1, help="seconds between polls with --watch (default %(default)s)")
+    state.set_defaults(fn=cmd_state)
+
+    stats = sub.add_parser("trainer-stats", help="last trainer session and per-character stats (RAM only)")
+    stats.add_argument("--items", action="store_true", help="also list the per-item stats")
+    stats.add_argument("--all", action="store_true", help="characters in ASCII order instead of worst first; with --items also the never-completed ones")
+    stats.set_defaults(fn=cmd_trainer_stats)
+
+    taphold = sub.add_parser("taphold", help="which keys Chordal Hold and Flow Tap leave alone")
+    taphold.add_argument("layer", nargs="?", type=int, help="keymap layer (default: the layers active right now)")
+    taphold.set_defaults(fn=cmd_taphold)
 
     args = p.parse_args()
     if args.cmd == "status" and args.sub == "set" and len(args.text) > STATUS_ROWS:
